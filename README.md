@@ -8,6 +8,8 @@ Enterprise detection engineering platform built on a production ELK SIEM. Sigma 
 
 *Detection rules firing in production across Elastic and Splunk: SSH brute force, persistence mechanisms, credential stuffing, suspicious process execution, and more. Deployed and managed entirely from the command line.*
 
+**Case Study: [How `date_trunc` Breaks ESQL Correlation Rules](correlation-case-study/)** - A false-negative gap in pySigma's Elasticsearch backend that causes correlation rules to silently miss attacks straddling fixed time boundaries. Validated with controlled A/B testing.
+
 ---
 
 ## Table of Contents
