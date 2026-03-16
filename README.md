@@ -103,7 +103,7 @@ I needed a way to search the 3,000+ rules in the SigmaHQ community repository. D
 
 ## Convert
 
-The convert command translates Sigma YAML to native query languages across all configured backends. Without a client flag, it shows raw pySigma translation. A `--backend` flag filters output to a specific platform. For backends with multiple query languages (like Elastic's Lucene, ES|QL, EQL, and Huey), it displays all translations for that platform. A `--client` flag layers in the client's backend profile and overlay configuration, skipping backends not in the client's scope. Any active overlays (thresholds, overrides, scheduling) appear below the translation.
+The convert command translates Sigma YAML to native query languages across all configured backends. Without a client flag, it shows raw pySigma translation. A `--backend` flag filters output to a specific platform. For backends with multiple query languages (like Elastic's Lucene, ES|QL, EQL, and Kuey), it displays all translations for that platform. A `--client` flag layers in the client's backend profile and overlay configuration, skipping backends not in the client's scope. Any active overlays (thresholds, overrides, scheduling) appear below the translation.
 
 ![Convert: Raw Translation](screenshots/convert-file.png)
 
