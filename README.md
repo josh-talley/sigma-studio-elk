@@ -178,10 +178,6 @@ This walkthrough uses the SSH Brute Force Success (Temporal) correlation rule. p
 
 *Same rule with `--backend elastic`, showing all four Elastic query languages: EQL, ES|QL, Kuery, and Lucene. Each translation targets a different query capability within the platform.*
 
-![Tune: Client-Scoped Conversion](screenshots/tune-convert-client.png)
-
-*Client-scoped conversion. Platform strictness skips backends not configured for Linux (Chronicle, LogScale, Sentinel). Elastic and Splunk remain in scope, but no overlays are active yet.*
-
 ### Applying Overlays
 
 ![Tune: Elastic EQL Override](screenshots/tune-overlay-elastic.png)
