@@ -1,8 +1,8 @@
-# Sigma Studio v2.0 + Enterprise ELK SIEM
+# Sigma Studio v2.0 + Production ELK SIEM
 
 **Discover • Convert • Deploy • Tune • Repeat**
 
-Enterprise detection engineering platform built on a production ELK SIEM. Sigma Studio converts vendor-agnostic Sigma rules to native SIEM queries, deploys them via API across Elastic and Splunk, and manages the full detection lifecycle from a single Python CLI.
+Detection engineering system built on a production ELK SIEM. Sigma Studio converts vendor-agnostic Sigma rules to native SIEM queries, deploys them via API across Elastic and Splunk, and manages the detection lifecycle (discover, convert, deploy, tune) from a single Python CLI.
 
 ![Production Alerts](screenshots/alerts-production.png)
 
@@ -15,6 +15,7 @@ Enterprise detection engineering platform built on a production ELK SIEM. Sigma 
 ## Table of Contents
 
 - [The Approach](#the-approach)
+- [Case Study: `date_trunc` Correlation Failures](correlation-case-study/)
 - [Infrastructure](#infrastructure)
 - [Portfolio Backends](#portfolio-backends)
 - [Rule Classification](#rule-classification)
@@ -35,9 +36,9 @@ Enterprise detection engineering platform built on a production ELK SIEM. Sigma 
 
 ## The Approach
 
-One of the tricks of the current job market is proving problem-solving on an institutional level. I put myself in the shoes of an MDR provider with clients running managed SIEMs and designed Sigma Studio with a "Client 1" model.
+I put myself in the shoes of an MDR provider with clients running managed SIEMs and designed Sigma Studio around a "Client 1" model. LightworksDevCo is the first client: multiple SIEM backend configurations (ELK + Dockerized Splunk), multiple indices, client-specific rule tuning. The architecture supports additional clients and backends. If there's a pySigma backend and pipeline, it plugs in.
 
-LightworksDevCo is the first client: multiple SIEM backend configurations (ELK + Dockerized Splunk), multiple indices, client-specific rule tuning. The system is designed for additional clients, additional backends, and additional configurations. If there's a pySigma backend and pipeline, the system is extensible.
+The system covers discovery, conversion, deployment, and tuning. A formal testing stage (validating rules against labeled attack data before production promotion) isn't built yet because the homelab doesn't generate the attack variety to make it useful. The [case study on `date_trunc` correlation failures](correlation-case-study/) is where that thinking shows up: controlled A/B testing against a gap I found in pySigma's correlation logic.
 
 ---
 
@@ -102,19 +103,19 @@ I needed a way to search the 3,000+ rules in the SigmaHQ community repository. D
 
 ## Convert
 
-The convert command translates Sigma YAML to native query languages across all portfolio backends simultaneously. A `--file` flag shows pure pySigma translation with canonical field mappings. A `--client` flag layers in the client's backend profile and overlay configuration, skipping backends not in the client's scope. Any active overlays (thresholds, overrides, scheduling) appear below the translation grid.
+The convert command translates Sigma YAML to native query languages across all configured backends. Without a client flag, it shows raw pySigma translation. A `--backend` flag filters output to a specific platform. For backends with multiple query languages (like Elastic's Lucene, ES|QL, EQL, and Huey), it displays all translations for that platform. A `--client` flag layers in the client's backend profile and overlay configuration, skipping backends not in the client's scope. Any active overlays (thresholds, overrides, scheduling) appear below the translation.
 
-![Convert: File Translation](screenshots/convert-file.png)
+![Convert: Raw Translation](screenshots/convert-file.png)
 
-*A single Windows rule (Suspicious Download Via Certutil.EXE) translated to all 5 backends. Note the `pySigma*` tier: no field-mapping pipeline exists for some of these platforms, so the output uses source field names. The asterisk is your signal to verify field compatibility.*
+*A Windows rule (Suspicious Download Via Certutil.EXE) converted across all configured backends. Without a client flag, the output shows raw pySigma translation. The `pySigma*` tier indicates backends without a field-mapping pipeline, so the asterisk is your signal to verify field compatibility.*
 
 ![Convert: Client + Windows Rule](screenshots/convert-client-win.png)
 
-*Client-specific conversion for a Windows Scheduled Task rule. The top grid shows each backend's translation. Below it, the active pySigma+ and Override deployment details: query language, schedule, index pattern, and deployment reason.*
+*Client-scoped conversion for a Windows Scheduled Task rule. Backends show Elastic and Splunk translations with active deployment overlays: query language, schedule, index pattern, and deployment reason.*
 
-![Convert: Linux Override Rule](screenshots/convert-linux.png)
+![Convert: Client + Linux Override Rule](screenshots/convert-linux.png)
 
-*A Linux community rule (Mask System Power Settings) with active Override deployments on both Elastic and Splunk. The override reason explains why pySigma was bypassed: canonical Sigma field mappings don't map cleanly to ECS `process.executable`/`process.args` for Auditbeat events. Each backend gets its own hand-written query, independently tuned.*
+*A Linux community rule (Mask Power Settings Via Systemctl) with active Override deployments on both Elastic and Splunk. The override reason documents why pySigma was bypassed: canonical Sigma field mappings don't map cleanly to ECS `process.executable`/`process.args` for Auditbeat events. Each backend gets its own hand-written query, independently tuned.*
 
 ---
 
@@ -169,13 +170,17 @@ This walkthrough uses the SSH Brute Force Success (Temporal) correlation rule. p
 
 ### Before: Raw Conversion
 
-![Tune: File Conversion](screenshots/tune-convert-file.png)
+![Tune: Raw Conversion](screenshots/tune-convert-file.png)
 
-*The correlation rule converted across all 5 backends with `convert --file`. No client context, no overlays. pySigma generates correlation syntax from the portable YAML.*
+*The correlation rule converted across all 5 backends. No client context, no overlays. pySigma generates correlation syntax from the portable YAML.*
+
+![Tune: Backend-Filtered Conversion](screenshots/convert-temporal-elastic-only.png)
+
+*Same rule with `--backend elastic`, showing all four Elastic query languages: EQL, ES|QL, Kuery, and Lucene. Each translation targets a different query capability within the platform.*
 
 ![Tune: Client-Scoped Conversion](screenshots/tune-convert-client.png)
 
-*Client-specific conversion with `convert --client`. Platform strictness skips backends not configured for Linux (Chronicle, LogScale, Sentinel). Elastic and Splunk remain in scope, but no overlays are active yet.*
+*Client-scoped conversion. Platform strictness skips backends not configured for Linux (Chronicle, LogScale, Sentinel). Elastic and Splunk remain in scope, but no overlays are active yet.*
 
 ### Applying Overlays
 
@@ -218,7 +223,7 @@ Overlays support full CRUD operations independently of rule deployment. They can
 
 ## Detection Rule Portfolio
 
-The rule count here reflects a homelab, not a production SOC. What matters is the variety of rule types, the multi-SIEM deployment, and the architecture that manages them. The same system handles this portfolio or one ten times the size.
+The rule count here reflects a homelab, not a production SOC. What matters is the variety of rule types, the multi-SIEM deployment, and the architecture that manages them.
 
 ### Linux Detection: Custom Rules
 
@@ -226,28 +231,36 @@ The rule count here reflects a homelab, not a production SOC. What matters is th
 
 | Detection Rule | Type | Logic | MITRE ATT&CK |
 |---|---|---|---|
-| SSH Brute Force | Threshold | 5+ failures per source IP in 2 min | T1110.001, T1110.003 |
+| SSH Brute Force (Base Rule) | Threshold | 5+ failures per source IP in 2 min | T1110.001, T1110.003 |
 | Port Scan | Cardinality | 10+ unique ports per source IP in 15 min | T1046 |
 | Credential Stuffing | Cardinality | 5+ unique usernames per source IP in 5 min | T1110.004 |
 | High-Risk Port Access | Threshold | 5+ blocked connections to sensitive ports in 10 min | T1021, T1133 |
 | Sudo Auth Failures | Threshold | 3+ privilege escalation failures in 5 min | T1548.003 |
+
+*SSH Brute Force is a building-block base rule (`ssh-brute-fail-base`) that feeds the SSH Brute Force (Temporal) correlation below. Not deployed standalone.*
 
 **Host Activity (Auditbeat)**
 
 | Detection Rule | Type | Logic | MITRE ATT&CK |
 |---|---|---|---|
 | Sensitive File Access | Query | Access to /etc/passwd, /etc/shadow by non-system processes | T1003.008 |
+| Secrets Directory Access | Query | Access to /etc/ssl/private, /etc/pki by non-system processes | T1552.004 |
+| SSH Key Read Access | Query | Read access to SSH private keys | T1552.004 |
 | SSH Key Modification | Query | Changes to authorized_keys files | T1098.004 |
-| Log Tampering Attempt | Query | Deletion/truncation of audit logs, syslog, auth logs | T1070 |
-| Suspicious Process Execution | Query | Binaries executed from /tmp, /var/tmp, /dev/shm | T1036 |
-| Reverse Shell Detection | Query | Outbound connections from shell processes to external IPs | T1059 |
+| Log Tampering Attempt | Query | Deletion/truncation of audit logs, syslog, auth logs | T1070.002 |
+| ELK Config Modification | Query | Changes to ELK stack configuration files via auditd | T1562.001 |
+| Shell Config Modification | Query | Changes to .zshrc, .zsh-alias, .zsh-env, .zsh-func | T1546.004 |
+| Suspicious Process Execution | Query | Execution of common attacker tools from suspicious paths | T1059 |
+| Reverse Shell Detection | Override | Outbound shell connections from suspicious processes | T1059.004, T1071.001 |
+| Auditctl Disable Auditing | Override | Attempts to disable kernel audit rules | T1562.012 |
 
 ### Correlation Rules
 
 | Detection Rule | Type | Logic | MITRE ATT&CK |
 |---|---|---|---|
-| SSH Brute Force (Temporal) | Correlation | 5+ SSH failures then success from same source IP in 2 min | T1110 |
+| SSH Brute Force (Temporal) | Correlation | 5+ SSH failures then success from same source IP in 2 min | T1110.001, T1110.003 |
 | Cron Job Persistence | Correlation | 2+ cron modifications by same user/host in 2 min | T1053.003 |
+| Credential Stuffing (Cardinality) | Correlation | 5+ unique usernames per source IP/host in 5 min | T1110.004 |
 
 *Correlation rules deploy only to backends with native aggregation support (Elastic ES|QL, Splunk SPL). Building-block base rules are automatically suppressed in multi-rule deployments to prevent alert noise.*
 
@@ -256,8 +269,8 @@ The rule count here reflects a homelab, not a production SOC. What matters is th
 | Detection Rule | Class | Platform | MITRE ATT&CK |
 |---|---|---|---|
 | Network Sniffing (tcpdump/tshark) | Override | Linux / Auditbeat | T1040 |
-| Mask Power Settings Via Systemctl | Override | Linux / Auditbeat | T1564 |
-| Audit Rules Deleted Via Auditctl | Override | Linux / Auditbeat | T1562.001 |
+| Mask Power Settings Via Systemctl | Override | Linux / Auditbeat | T1653 |
+| Audit Rules Deleted Via Auditctl | Override | Linux / Auditbeat | T1562.012 |
 | ld.so.preload Modification | Override | Linux / Auditbeat + Splunk | T1574.006 |
 
 *These community rules required Override classification. Canonical Sigma field mappings don't translate cleanly to ECS fields for Auditbeat kernel events. Each override includes a documented reason for the bypass.*
@@ -270,13 +283,15 @@ The rule count here reflects a homelab, not a production SOC. What matters is th
 | New User Created Via Net.EXE | pySigma | Windows / Sysmon | T1136.001 |
 | Suspicious Scheduled Task Creation | pySigma | Windows / Sysmon | T1053.005 |
 | Suspicious Encoded PowerShell Command Line | pySigma | Windows / Sysmon | T1059.001 |
+| Shadow Copies Deletion Via Vssadmin.EXE | pySigma | Windows / Sysmon | T1490 |
+| Systeminfo Execution | pySigma | Windows / Sysmon | T1082 |
 | Security Privileges Enumeration Via Whoami.EXE | pySigma | Windows / Sysmon | T1033 |
 
 *Windows rules are sourced from SigmaHQ and deployed to my Azure VM log pipeline. Up to this point the lab has been Linux-focused. These rules prove the cross-platform story and validate Windows Sysmon log translation across backends.*
 
 ### MITRE ATT&CK Coverage
 
-18 techniques across 9 tactics: Initial Access, Execution, Persistence, Privilege Escalation, Defense Evasion, Credential Access, Discovery, Lateral Movement, and Command & Control.
+28 techniques across 10 tactics: Initial Access, Execution, Persistence, Privilege Escalation, Defense Evasion, Credential Access, Discovery, Lateral Movement, Command & Control, and Impact.
 
 ---
 
@@ -341,8 +356,8 @@ Custom health check script provides single-command visibility into the full stac
 | Metric | Result |
 |--------|--------|
 | **Security Events** | ~8M processed with zero pipeline failures |
-| **Detection Rules** | 25 rules across 2 SIEM platforms, 5 rule types, 6 rule classes |
-| **MITRE Coverage** | 18 techniques across 9 tactics |
+| **Detection Rules** | ~30 rules across 2 SIEM platforms, 5 rule types, 6 rule classes |
+| **MITRE Coverage** | 28 techniques across 10 tactics |
 | **Backends** | 5 targets (2 deployed, 3 conversion) |
 | **Query Languages** | Lucene, ES\|QL, EQL, SPL, KQL, YARA-L, LogScale QL |
 | **ECS Compliance** | 100% across all log sources |
@@ -357,9 +372,9 @@ Custom health check script provides single-command visibility into the full stac
 - **Python tooling** with API integration (Kibana Detection Engine API, Splunk REST API, PostgreSQL, DuckDB)
 - **Operational thinking** including deduplication, building-block suppression, drift detection, client isolation, overlay tuning
 - **Data engineering** with ECS-compliant field mapping, ingest pipeline design, log quality management, 4-tier data stream architecture
-- **Problem solving** where every engineering challenge documented above was diagnosed and resolved without outside help
+- **Problem solving** documented through real engineering challenges, each traced from symptoms to root cause and fix
 
-This is a production security monitoring environment, not a tutorial deployment. It processes real traffic, catches actual threats, and requires ongoing tuning. Every dashboard, detection rule, and engineering decision exists because it solved a real monitoring need.
+This environment processes real traffic, catches real threats, and requires ongoing tuning. Every dashboard, detection rule, and engineering decision exists because it solved an actual monitoring problem.
 
 ---
 
@@ -413,4 +428,4 @@ This is a production security monitoring environment, not a tutorial deployment.
 
 ---
 
-*Version 2.0 | February 2026*
+*Version 2.0 | March 2026*
