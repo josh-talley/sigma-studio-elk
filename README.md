@@ -352,7 +352,7 @@ Custom health check script provides single-command visibility into the full stac
 | Metric | Result |
 |--------|--------|
 | **Security Events** | ~8M processed with zero pipeline failures |
-| **Detection Rules** | ~30 rules across 2 SIEM platforms, 5 rule types, 6 rule classes |
+| **Detection Rules** | 30+ rules across 2 SIEM platforms, 5 rule types, 6 rule classes |
 | **MITRE Coverage** | 28 techniques across 10 tactics |
 | **Backends** | 5 targets (2 deployed, 3 conversion) |
 | **Query Languages** | Lucene, ES\|QL, EQL, SPL, KQL, YARA-L, LogScale QL |
